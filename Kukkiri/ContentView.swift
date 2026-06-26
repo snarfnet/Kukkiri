@@ -21,6 +21,9 @@ struct ContentView: View {
             VStack(spacing: 16) {
                 header
                 imageArea
+                if let original = vm.original, let result = vm.result {
+                    SizeCompareView(before: original, after: result, accent: accent, accent2: accent2, card: card)
+                }
                 controls
                 Spacer(minLength: 0)
             }
@@ -182,6 +185,93 @@ struct ContentView: View {
             }
         )
         .clipShape(Capsule())
+    }
+}
+
+// MARK: - サイズ比較（入れ子図）
+
+struct SizeCompareView: View {
+    let before: UIImage
+    let after: UIImage
+    let accent: Color
+    let accent2: Color
+    let card: Color
+
+    private func px(_ img: UIImage) -> (w: Int, h: Int) {
+        if let cg = img.cgImage { return (cg.width, cg.height) }
+        return (Int(img.size.width * img.scale), Int(img.size.height * img.scale))
+    }
+
+    var body: some View {
+        let b = px(before)
+        let a = px(after)
+        let ratio = b.w > 0 ? Double(a.w) / Double(b.w) : 1
+        let ratioText = abs(ratio - ratio.rounded()) < 0.05
+            ? "×\(Int(ratio.rounded()))"
+            : String(format: "×%.1f", ratio)
+
+        return HStack(spacing: 14) {
+            diagram(bw: b.w, bh: b.h, aw: a.w, ah: a.h)
+                .frame(width: 120, height: 96)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(ratioText)
+                    .font(.system(size: 30, weight: .heavy, design: .rounded))
+                    .foregroundStyle(LinearGradient(colors: [accent, accent2], startPoint: .leading, endPoint: .trailing))
+                VStack(alignment: .leading, spacing: 2) {
+                    dimRow("元", "\(b.w)×\(b.h)", .white.opacity(0.45))
+                    dimRow("アップ", "\(a.w)×\(a.h)", accent)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: 18).fill(card))
+    }
+
+    private func dimRow(_ label: String, _ value: String, _ color: Color) -> some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(color)
+            Text(value)
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .foregroundColor(.white.opacity(0.85))
+        }
+    }
+
+    private func diagram(bw: Int, bh: Int, aw: Int, ah: Int) -> some View {
+        // 大きい方を外枠、小さい方を内側に実寸比で描く（出力が縮む場合も崩れない）
+        let afterBigger = aw >= bw
+        let big = afterBigger ? (w: aw, h: ah) : (w: bw, h: bh)
+        let small = afterBigger ? (w: bw, h: bh) : (w: aw, h: ah)
+        let bigIsAfter = afterBigger
+
+        return GeometryReader { geo in
+            let maxW = geo.size.width
+            let maxH = geo.size.height
+            let aspect = big.h > 0 ? CGFloat(big.w) / CGFloat(big.h) : 1
+            var rw = maxW
+            var rh = rw / aspect
+            if rh > maxH { rh = maxH; rw = rh * aspect }
+            let scale = big.w > 0 ? CGFloat(small.w) / CGFloat(big.w) : 1
+
+            let outerColor = bigIsAfter ? accent : Color.white.opacity(0.6)
+            let innerColor = bigIsAfter ? Color.white.opacity(0.6) : accent
+
+            return ZStack(alignment: .bottomLeading) {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(outerColor.opacity(0.14))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(outerColor, lineWidth: 2))
+                    .frame(width: rw, height: rh)
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(innerColor.opacity(0.30))
+                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(innerColor, lineWidth: 1))
+                    .frame(width: rw * scale, height: rh * scale)
+            }
+            .frame(width: maxW, height: maxH, alignment: .bottomLeading)
+        }
     }
 }
 
