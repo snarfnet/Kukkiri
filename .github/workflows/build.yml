@@ -77,9 +77,14 @@ jobs:
 
     - name: Upload to TestFlight
       run: |
+        set -o pipefail
         xcrun altool --upload-app \
           -f build/export/Kukkiri.ipa \
           -t ios \
           --apiKey WDXGY9WX55 \
           --apiIssuer 2be0734f-943a-4d61-9dc9-5d9045c46fec \
-          --verbose
+          --verbose 2>&1 | tee altool.log
+        if grep -q "ERROR" altool.log; then
+          echo "::error::altool reported an error during upload"
+          exit 1
+        fi
