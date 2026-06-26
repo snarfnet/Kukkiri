@@ -44,8 +44,8 @@ struct ContentView: View {
             Image(systemName: "wand.and.stars")
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(LinearGradient(colors: [accent, accent2], startPoint: .leading, endPoint: .trailing))
-            Text("クッキリ")
-                .font(.system(size: 24, weight: .heavy, design: .rounded))
+            Text("アップスケール")
+                .font(.system(size: 22, weight: .heavy, design: .rounded))
                 .foregroundColor(.white)
             Spacer()
             Text("4×")
@@ -81,7 +81,7 @@ struct ContentView: View {
                             .progressViewStyle(.linear)
                             .tint(accent)
                             .frame(width: 180)
-                        Text("\(Int(vm.progress * 100))%  クッキリ処理中…")
+                        Text("\(Int(vm.progress * 100))%  アップスケール中…")
                             .font(.system(size: 14, weight: .semibold, design: .rounded))
                             .foregroundColor(.white)
                     }
@@ -112,8 +112,9 @@ struct ContentView: View {
             }
 
             if vm.original != nil && vm.result == nil && !vm.isProcessing {
+                modePicker
                 Button { vm.run() } label: {
-                    label("wand.and.stars", "クッキリにする", filled: true)
+                    label("wand.and.stars", "アップスケールする", filled: true)
                 }
             }
 
@@ -126,6 +127,39 @@ struct ContentView: View {
 
             if let err = vm.errorText {
                 Text(err).font(.system(size: 12)).foregroundColor(.red.opacity(0.8))
+            }
+        }
+    }
+
+    private var modePicker: some View {
+        HStack(spacing: 10) {
+            ForEach(OutputMode.allCases) { mode in
+                let selected = vm.outputMode == mode
+                Button { vm.outputMode = mode } label: {
+                    VStack(spacing: 4) {
+                        HStack(spacing: 6) {
+                            Image(systemName: mode.icon)
+                            Text(mode.title).font(.system(size: 15, weight: .bold, design: .rounded))
+                        }
+                        Text(mode.note)
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundColor(selected ? .black.opacity(0.7) : .white.opacity(0.5))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .foregroundColor(selected ? .black : .white)
+                    .background(
+                        Group {
+                            if selected {
+                                LinearGradient(colors: [accent, accent2], startPoint: .leading, endPoint: .trailing)
+                            } else {
+                                Color.white.opacity(0.08)
+                            }
+                        }
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -179,7 +213,7 @@ struct CompareView: View {
                 pos = min(max(v.location.x / w, 0), 1)
             })
             .overlay(alignment: .topLeading) { tag("元", .black.opacity(0.5)) }
-            .overlay(alignment: .topTrailing) { tag("クッキリ", .blue.opacity(0.6)) }
+            .overlay(alignment: .topTrailing) { tag("アップ", .blue.opacity(0.6)) }
         }
     }
 
