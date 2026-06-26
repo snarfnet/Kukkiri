@@ -26,17 +26,23 @@ final class UpscaleViewModel: ObservableObject {
         }
     }
 
+    /// 入力長辺の上限。これを超える画像は処理前に縮小する。
+    /// 1536 × 4倍 = 6144px → 印刷に十分なDPI。RGBA約113MBで実機メモリに収まる。
+    private let maxInputLongSide: CGFloat = 1536
+
     func run() {
         guard let original else { return }
         isProcessing = true
         progress = 0
         errorText = nil
 
+        let input = downscaleIfNeeded(original)
+
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             do {
                 let engine = try self.makeEngine()
-                let out = try engine.upscale(original) { p in
+                let out = try engine.upscale(input) { p in
                     Task { @MainActor in self.progress = p }
                 }
                 await MainActor.run {
@@ -61,6 +67,21 @@ final class UpscaleViewModel: ObservableObject {
 
     private nonisolated func makeEngine() throws -> UpscaleEngine {
         try UpscaleEngine()
+    }
+
+    /// 長辺が上限を超える場合のみ Lanczos 相当の高品質縮小を行う。
+    private func downscaleIfNeeded(_ image: UIImage) -> UIImage {
+        let longSide = max(image.size.width, image.size.height)
+        guard longSide > maxInputLongSide else { return image }
+        let ratio = maxInputLongSide / longSide
+        let newSize = CGSize(width: floor(image.size.width * ratio),
+                             height: floor(image.size.height * ratio))
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
     }
 
     private func writeTemp(_ img: UIImage) -> URL? {
