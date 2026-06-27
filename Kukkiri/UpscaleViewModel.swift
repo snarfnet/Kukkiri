@@ -40,6 +40,12 @@ final class UpscaleViewModel: ObservableObject {
     @Published var outputMode: OutputMode = .tshirt
     @Published var subjectMode: SubjectMode = .photo
 
+    @Published var isBatchProcessing = false
+    @Published var batchTotal = 0
+    @Published var batchDone = 0
+    @Published var batchSaved = 0
+    @Published var batchFinished = false
+
     private var engine: UpscaleEngine?
 
     func load(_ item: PhotosPickerItem) async {
@@ -97,7 +103,10 @@ final class UpscaleViewModel: ObservableObject {
 
     /// 長辺が上限を超える場合のみ Lanczos 相当の高品質縮小を行う。上限は出力モードで決まる。
     private func downscaleIfNeeded(_ image: UIImage) -> UIImage {
-        let cap = outputMode.maxInputLongSide
+        Self.downscale(image, cap: outputMode.maxInputLongSide)
+    }
+
+    nonisolated private static func downscale(_ image: UIImage, cap: CGFloat) -> UIImage {
         let longSide = max(image.size.width, image.size.height)
         guard longSide > cap else { return image }
         let ratio = cap / longSide
@@ -108,6 +117,48 @@ final class UpscaleViewModel: ObservableObject {
         let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
         return renderer.image { _ in
             image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+    }
+
+    /// 複数枚をまとめてアップスケールし、各結果を写真ライブラリに保存する。
+    func runBatch(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        isBatchProcessing = true
+        batchTotal = items.count
+        batchDone = 0
+        batchSaved = 0
+        batchFinished = false
+        errorText = nil
+        let modelName = subjectMode.modelName
+        let cap = outputMode.maxInputLongSide
+
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            do {
+                let engine = try self.makeEngine(modelName: modelName)
+                for item in items {
+                    if let data = try? await item.loadTransferable(type: Data.self),
+                       let img = UIImage(data: data) {
+                        let input = Self.downscale(img, cap: cap)
+                        if let out = try? engine.upscale(input, progress: { _ in }) {
+                            await MainActor.run {
+                                UIImageWriteToSavedPhotosAlbum(out, nil, nil, nil)
+                                self.batchSaved += 1
+                            }
+                        }
+                    }
+                    await MainActor.run { self.batchDone += 1 }
+                }
+                await MainActor.run {
+                    self.isBatchProcessing = false
+                    self.batchFinished = true
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorText = "一括処理に失敗しました"
+                    self.isBatchProcessing = false
+                }
+            }
         }
     }
 

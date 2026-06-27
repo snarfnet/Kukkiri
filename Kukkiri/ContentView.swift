@@ -4,6 +4,7 @@ import PhotosUI
 struct ContentView: View {
     @StateObject private var vm = UpscaleViewModel()
     @State private var pickerItem: PhotosPickerItem?
+    @State private var batchItems: [PhotosPickerItem] = []
     @State private var showShare = false
     @State private var comparePos: CGFloat = 0.5
 
@@ -21,11 +22,15 @@ struct ContentView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     header
-                    imageArea
-                    if let original = vm.original, let result = vm.result {
-                        SizeCompareView(before: original, after: result, accent: accent, accent2: accent2, card: card)
+                    if vm.isBatchProcessing {
+                        batchProgress
+                    } else {
+                        imageArea
+                        if let original = vm.original, let result = vm.result {
+                            SizeCompareView(before: original, after: result, accent: accent, accent2: accent2, card: card)
+                        }
+                        controls
                     }
-                    controls
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
@@ -36,10 +41,35 @@ struct ContentView: View {
             guard let item else { return }
             Task { await vm.load(item) }
         }
+        .onChange(of: batchItems) { items in
+            guard !items.isEmpty else { return }
+            vm.runBatch(items)
+            batchItems = []
+        }
         .sheet(isPresented: $showShare) {
             if let url = vm.shareURL { ShareSheet(items: [url]) }
         }
         .alert("保存しました", isPresented: $vm.didSave) { Button("OK", role: .cancel) {} }
+        .alert("\(vm.batchSaved)枚を写真に保存しました", isPresented: $vm.batchFinished) { Button("OK", role: .cancel) {} }
+    }
+
+    private var batchProgress: some View {
+        VStack(spacing: 16) {
+            Spacer(minLength: 40)
+            ProgressView(value: vm.batchTotal > 0 ? Double(vm.batchDone) / Double(vm.batchTotal) : 0)
+                .progressViewStyle(.linear)
+                .tint(accent)
+                .frame(width: 200)
+            Text("\(vm.batchDone) / \(vm.batchTotal) 枚")
+                .font(.system(size: 18, weight: .heavy, design: .rounded))
+                .foregroundColor(.white)
+            Text("まとめてアップスケール中…")
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundColor(.white.opacity(0.6))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .background(RoundedRectangle(cornerRadius: 22).fill(card))
     }
 
     // MARK: header
@@ -146,11 +176,16 @@ struct ContentView: View {
                 label("photo", vm.original == nil ? "写真を選ぶ" : "別の写真", filled: true)
             }
 
-            if vm.original != nil && vm.result == nil && !vm.isProcessing {
+            if vm.result == nil && !vm.isProcessing {
                 subjectPicker
                 modePicker
-                Button { vm.run() } label: {
-                    label("wand.and.stars", "アップスケールする", filled: true)
+                if vm.original != nil {
+                    Button { vm.run() } label: {
+                        label("wand.and.stars", "アップスケールする", filled: true)
+                    }
+                }
+                PhotosPicker(selection: $batchItems, maxSelectionCount: 20, matching: .images) {
+                    label("square.stack.3d.up", "まとめて変換（複数枚）", filled: false)
                 }
             }
 
