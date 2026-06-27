@@ -18,17 +18,19 @@ struct ContentView: View {
             LinearGradient(colors: [bgTop, bgBot], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
 
-            VStack(spacing: 16) {
-                header
-                imageArea
-                if let original = vm.original, let result = vm.result {
-                    SizeCompareView(before: original, after: result, accent: accent, accent2: accent2, card: card)
+            ScrollView {
+                VStack(spacing: 16) {
+                    header
+                    imageArea
+                    if let original = vm.original, let result = vm.result {
+                        SizeCompareView(before: original, after: result, accent: accent, accent2: accent2, card: card)
+                    }
+                    controls
                 }
-                controls
-                Spacer(minLength: 0)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
         }
         .onChange(of: pickerItem) { item in
             guard let item else { return }
@@ -62,6 +64,20 @@ struct ContentView: View {
     // MARK: image area
 
     private var imageArea: some View {
+        Group {
+            if vm.result == nil {
+                PhotosPicker(selection: $pickerItem, matching: .images) {
+                    imageContent
+                }
+                .buttonStyle(.plain)
+                .disabled(vm.isProcessing)
+            } else {
+                imageContent
+            }
+        }
+    }
+
+    private var imageContent: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 22).fill(card)
 
@@ -93,6 +109,22 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 420)
+        .overlay(alignment: .bottom) {
+            if let original = vm.original, vm.result == nil, !vm.isProcessing {
+                let p = px(original)
+                Text("\(p.w) × \(p.h) px")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Capsule().fill(.black.opacity(0.55)))
+                    .padding(.bottom, 12)
+            }
+        }
+    }
+
+    private func px(_ img: UIImage) -> (w: Int, h: Int) {
+        if let cg = img.cgImage { return (cg.width, cg.height) }
+        return (Int(img.size.width * img.scale), Int(img.size.height * img.scale))
     }
 
     private var placeholder: some View {
