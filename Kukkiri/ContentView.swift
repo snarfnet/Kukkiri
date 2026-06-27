@@ -147,6 +147,7 @@ struct ContentView: View {
             }
 
             if vm.original != nil && vm.result == nil && !vm.isProcessing {
+                subjectPicker
                 modePicker
                 Button { vm.run() } label: {
                     label("wand.and.stars", "アップスケールする", filled: true)
@@ -166,37 +167,51 @@ struct ContentView: View {
         }
     }
 
+    private var subjectPicker: some View {
+        HStack(spacing: 10) {
+            ForEach(SubjectMode.allCases) { mode in
+                modeCard(icon: mode.icon, title: mode.title, note: mode.note,
+                         selected: vm.subjectMode == mode) { vm.subjectMode = mode }
+            }
+        }
+    }
+
     private var modePicker: some View {
         HStack(spacing: 10) {
             ForEach(OutputMode.allCases) { mode in
-                let selected = vm.outputMode == mode
-                Button { vm.outputMode = mode } label: {
-                    VStack(spacing: 4) {
-                        HStack(spacing: 6) {
-                            Image(systemName: mode.icon)
-                            Text(mode.title).font(.system(size: 15, weight: .bold, design: .rounded))
-                        }
-                        Text(mode.note)
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundColor(selected ? .black.opacity(0.7) : .white.opacity(0.5))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .foregroundColor(selected ? .black : .white)
-                    .background(
-                        Group {
-                            if selected {
-                                LinearGradient(colors: [accent, accent2], startPoint: .leading, endPoint: .trailing)
-                            } else {
-                                Color.white.opacity(0.08)
-                            }
-                        }
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                }
-                .buttonStyle(.plain)
+                modeCard(icon: mode.icon, title: mode.title, note: mode.note,
+                         selected: vm.outputMode == mode) { vm.outputMode = mode }
             }
         }
+    }
+
+    private func modeCard(icon: String, title: String, note: String,
+                          selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: icon)
+                    Text(title).font(.system(size: 15, weight: .bold, design: .rounded))
+                }
+                Text(note)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundColor(selected ? .black.opacity(0.7) : .white.opacity(0.5))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .foregroundColor(selected ? .black : .white)
+            .background(
+                Group {
+                    if selected {
+                        LinearGradient(colors: [accent, accent2], startPoint: .leading, endPoint: .trailing)
+                    } else {
+                        Color.white.opacity(0.08)
+                    }
+                }
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
     }
 
     private func label(_ icon: String, _ text: String, filled: Bool) -> some View {
@@ -313,6 +328,7 @@ struct CompareView: View {
     let before: UIImage
     let after: UIImage
     @Binding var pos: CGFloat
+    @State private var loupePoint: CGPoint?
 
     var body: some View {
         GeometryReader { geo in
@@ -334,9 +350,36 @@ struct CompareView: View {
             .gesture(DragGesture().onChanged { v in
                 pos = min(max(v.location.x / w, 0), 1)
             })
+            // ルーペ: 長押しドラッグでなぞった部分を等倍拡大
+            .gesture(LongPressGesture(minimumDuration: 0.15).sequenced(before: DragGesture(minimumDistance: 0))
+                .onChanged { value in
+                    if case .second(true, let drag?) = value { loupePoint = drag.location }
+                }
+                .onEnded { _ in loupePoint = nil })
             .overlay(alignment: .topLeading) { tag("元", .black.opacity(0.5)) }
             .overlay(alignment: .topTrailing) { tag("アップ", .blue.opacity(0.6)) }
+            .overlay { if let p = loupePoint { loupe(geo: geo, p: p) } }
         }
+    }
+
+    private func loupe(geo: GeometryProxy, p: CGPoint) -> some View {
+        let size: CGFloat = 130
+        let zoom: CGFloat = 3
+        let cx = min(max(p.x, size / 2), geo.size.width - size / 2)
+        let cy = max(p.y - size / 2 - 30, size / 2)
+        return Image(uiImage: after)
+            .resizable().scaledToFit()
+            .frame(width: geo.size.width, height: geo.size.height)
+            .scaleEffect(zoom)
+            .offset(x: (geo.size.width / 2 - p.x) * zoom,
+                    y: (geo.size.height / 2 - p.y) * zoom)
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+            .overlay(Circle().stroke(.white, lineWidth: 3))
+            .overlay(Circle().stroke(.black.opacity(0.25), lineWidth: 1))
+            .shadow(radius: 8)
+            .position(x: cx, y: cy)
+            .allowsHitTesting(false)
     }
 
     private func tag(_ t: String, _ c: Color) -> some View {

@@ -15,10 +15,10 @@ final class UpscaleEngine {
     private let model: MLModel
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 
-    init() throws {
+    init(modelName: String = "realesrgan4x") throws {
         let cfg = MLModelConfiguration()
         cfg.computeUnits = .all     // Neural Engine 優先
-        guard let url = Bundle.main.url(forResource: "realesrgan4x", withExtension: "mlmodelc") else {
+        guard let url = Bundle.main.url(forResource: modelName, withExtension: "mlmodelc") else {
             throw EngineError.modelMissing
         }
         model = try MLModel(contentsOf: url, configuration: cfg)

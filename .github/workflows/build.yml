@@ -28,10 +28,11 @@ jobs:
         brew install xcodegen
         pip3 install --break-system-packages gdown || pip3 install gdown
 
-    - name: Download Core ML model
+    - name: Download Core ML models
       run: |
         python3 -m gdown 16JEWh48fgQc8az7avROePOd-PYda0Yi2 -O Kukkiri/realesrgan4x.mlmodel
-        ls -la Kukkiri/realesrgan4x.mlmodel
+        python3 -m gdown 1qXdLx46Lpqya7Txc5Wvgkd2Dqlnqm3Qm -O Kukkiri/realesrgan_anime4x.mlmodel
+        ls -la Kukkiri/*.mlmodel
 
     - name: Set build number
       run: |

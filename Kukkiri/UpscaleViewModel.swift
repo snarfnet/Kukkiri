@@ -16,6 +16,18 @@ enum OutputMode: String, CaseIterable, Identifiable {
     var maxInputLongSide: CGFloat { self == .tshirt ? 1024 : 1536 }
 }
 
+/// 被写体の種類。写真とイラスト・ロゴで最適なモデルを切り替える。
+enum SubjectMode: String, CaseIterable, Identifiable {
+    case photo
+    case illust
+
+    var id: String { rawValue }
+    var title: String { self == .photo ? "写真" : "イラスト・ロゴ" }
+    var note: String { self == .photo ? "人物・風景に" : "絵・ロゴ・アニメに" }
+    var icon: String { self == .photo ? "person.crop.square" : "paintbrush.pointed" }
+    var modelName: String { self == .photo ? "realesrgan4x" : "realesrgan_anime4x" }
+}
+
 @MainActor
 final class UpscaleViewModel: ObservableObject {
     @Published var original: UIImage?
@@ -26,6 +38,7 @@ final class UpscaleViewModel: ObservableObject {
     @Published var didSave = false
     @Published var shareURL: URL?
     @Published var outputMode: OutputMode = .tshirt
+    @Published var subjectMode: SubjectMode = .photo
 
     private var engine: UpscaleEngine?
 
@@ -49,11 +62,12 @@ final class UpscaleViewModel: ObservableObject {
         errorText = nil
 
         let input = downscaleIfNeeded(original)
+        let modelName = subjectMode.modelName
 
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             do {
-                let engine = try self.makeEngine()
+                let engine = try self.makeEngine(modelName: modelName)
                 let out = try engine.upscale(input) { p in
                     Task { @MainActor in self.progress = p }
                 }
@@ -77,8 +91,8 @@ final class UpscaleViewModel: ObservableObject {
         didSave = true
     }
 
-    private nonisolated func makeEngine() throws -> UpscaleEngine {
-        try UpscaleEngine()
+    private nonisolated func makeEngine(modelName: String) throws -> UpscaleEngine {
+        try UpscaleEngine(modelName: modelName)
     }
 
     /// 長辺が上限を超える場合のみ Lanczos 相当の高品質縮小を行う。上限は出力モードで決まる。
