@@ -97,6 +97,14 @@ final class UpscaleViewModel: ObservableObject {
         didSave = true
     }
 
+    // アップスケール結果を破棄し、選んだ写真の状態に戻す。
+    func reset() {
+        result = nil
+        shareURL = nil
+        progress = 0
+        errorText = nil
+    }
+
     private nonisolated func makeEngine(modelName: String) throws -> UpscaleEngine {
         try UpscaleEngine(modelName: modelName)
     }

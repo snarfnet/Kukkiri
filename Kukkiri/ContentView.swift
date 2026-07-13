@@ -194,6 +194,9 @@ struct ContentView: View {
                     Button { vm.save() } label: { label("square.and.arrow.down", "保存", filled: false) }
                     Button { showShare = true } label: { label("square.and.arrow.up", "共有", filled: false) }
                 }
+                Button { vm.reset() } label: {
+                    label("chevron.left", "戻る", filled: false)
+                }
             }
 
             if let err = vm.errorText {
