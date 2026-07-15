@@ -105,6 +105,22 @@ final class UpscaleViewModel: ObservableObject {
         errorText = nil
     }
 
+    // スクリーンショット撮影用のデモ状態。バンドルした before/after 見本を流し込む。
+    func loadDemo(screen: String) {
+        let before = UIImage(named: "demo_before")
+        let after = UIImage(named: "demo_after")
+        switch screen {
+        case "picked":
+            original = after
+        case "result":
+            original = before
+            result = after
+            shareURL = after.flatMap { writeTemp($0) }
+        default:
+            break
+        }
+    }
+
     private nonisolated func makeEngine(modelName: String) throws -> UpscaleEngine {
         try UpscaleEngine(modelName: modelName)
     }

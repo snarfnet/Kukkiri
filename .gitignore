@@ -4,3 +4,4 @@ build/
 .omc/
 Kukkiri/realesrgan4x.mlmodel
 Kukkiri/realesrgan_anime4x.mlmodel
+demo_src/

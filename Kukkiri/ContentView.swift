@@ -37,6 +37,11 @@ struct ContentView: View {
                 .padding(.bottom, 24)
             }
         }
+        .onAppear {
+            if let screen = ProcessInfo.processInfo.environment["KUKKIRI_DEMO"] {
+                vm.loadDemo(screen: screen)
+            }
+        }
         .onChange(of: pickerItem) { item in
             guard let item else { return }
             Task { await vm.load(item) }

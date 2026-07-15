@@ -1,0 +1,95 @@
+name: Capture App Store Screenshots
+
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: macos-latest
+
+    env:
+      BUNDLE_ID: app.kukkiri.upscaler.ios
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Select Xcode
+      run: |
+        XCODE_APP=$(ls /Applications/ | grep -E "^Xcode_2[6-9]|^Xcode_[3-9][0-9]" | sort -V | tail -1)
+        if [ -n "$XCODE_APP" ]; then
+          sudo xcode-select -s "/Applications/$XCODE_APP"
+        else
+          XCODE_APP=$(ls /Applications/ | grep "^Xcode_" | sort -V | tail -1)
+          sudo xcode-select -s "/Applications/$XCODE_APP"
+        fi
+        xcodebuild -version
+
+    - name: Install tools
+      run: brew install xcodegen
+
+    - name: Generate Xcode project
+      run: xcodegen generate
+
+    - name: Build for simulator
+      run: |
+        xcodebuild build \
+          -scheme Kukkiri \
+          -configuration Debug \
+          -destination "generic/platform=iOS Simulator" \
+          -derivedDataPath build/dd \
+          CODE_SIGNING_ALLOWED=NO
+        echo "APP_PATH=$(ls -d build/dd/Build/Products/Debug-iphonesimulator/Kukkiri.app)" >> "$GITHUB_ENV"
+        ls -la build/dd/Build/Products/Debug-iphonesimulator/
+
+    - name: Capture screenshots
+      run: |
+        set -e
+        mkdir -p shots
+
+        capture_device () {
+          local NAME="$1"       # simulator device type
+          local PREFIX="$2"     # output filename prefix
+          echo "=== $NAME ($PREFIX) ==="
+          local UDID
+          UDID=$(xcrun simctl create "shot-$PREFIX" "$NAME")
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override \
+            --time "9:41" --batteryState charged --batteryLevel 100 \
+            --cellularMode active --cellularBars 4 --wifiBars 3 --dataNetwork wifi || true
+          xcrun simctl install "$UDID" "$APP_PATH"
+
+          for SCREEN in home picked result; do
+            SIMCTL_CHILD_KUKKIRI_DEMO="$SCREEN" \
+              xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE_ID"
+            sleep 5
+            xcrun simctl io "$UDID" screenshot "shots/${PREFIX}_${SCREEN}.png"
+            xcrun simctl terminate "$UDID" "$BUNDLE_ID" || true
+          done
+
+          xcrun simctl shutdown "$UDID" || true
+        }
+
+        capture_device "iPhone 16 Plus" "iphone67"
+        capture_device "iPad Pro 13-inch (M4)" "ipad13"
+
+        echo "--- raw sizes ---"
+        for f in shots/*.png; do
+          sips -g pixelWidth -g pixelHeight "$f" | tr '\n' ' '; echo "  $f"
+        done
+
+    - name: Normalize iPad screenshots to 2048x2732
+      run: |
+        for f in shots/ipad13_*.png; do
+          sips -z 2732 2048 "$f" >/dev/null
+        done
+        echo "--- normalized sizes ---"
+        for f in shots/*.png; do
+          sips -g pixelWidth -g pixelHeight "$f" | tr '\n' ' '; echo "  $f"
+        done
+
+    - name: Upload screenshots artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: kukkiri-screenshots
+        path: shots/
