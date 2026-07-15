@@ -118,6 +118,7 @@ struct ContentView: View {
 
             if let result = vm.result, let original = vm.original {
                 CompareView(before: original, after: result, pos: $comparePos)
+                    .aspectRatio(original.size.width / max(original.size.height, 1), contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 22))
             } else if let original = vm.original {
                 Image(uiImage: original)
