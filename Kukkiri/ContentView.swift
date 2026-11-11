@@ -29,6 +29,9 @@ struct ContentView: View {
                         if let original = vm.original, let result = vm.result {
                             SizeCompareView(before: original, after: result, accent: accent, accent2: accent2, card: card)
                         }
+                        if let image = vm.result ?? vm.original {
+                            PrintPlanningView(image: image, isResult: vm.result != nil)
+                        }
                         controls
                     }
                 }
@@ -38,6 +41,9 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--store-screenshot") { vm.original = UIImage(named: "demo_before") }
+            #endif
             if let screen = ProcessInfo.processInfo.environment["KUKKIRI_DEMO"] {
                 vm.loadDemo(screen: screen)
             }
