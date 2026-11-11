@@ -41,6 +41,9 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--store-screenshot") { vm.original = UIImage(named: "demo_before") }
+            #endif
             if let screen = ProcessInfo.processInfo.environment["KUKKIRI_DEMO"] {
                 vm.loadDemo(screen: screen)
             }

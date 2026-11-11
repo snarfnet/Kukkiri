@@ -1,0 +1,44 @@
+name: Kukkiri store screenshots
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: macos-26
+    timeout-minutes: 25
+    strategy:
+      matrix:
+        device: [iphone, ipad]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch bundled upscaling models
+        run: |
+          python3 -m pip install --break-system-packages gdown
+          python3 -m gdown 16JEWh48fgQc8az7avROePOd-PYda0Yi2 -O Kukkiri/realesrgan4x.mlmodel
+          python3 -m gdown 1qXdLx46Lpqya7Txc5Wvgkd2Dqlnqm3Qm -O Kukkiri/realesrgan_anime4x.mlmodel
+      - name: Generate project
+        run: |
+          command -v xcodegen || brew install xcodegen
+          xcodegen generate
+
+      - name: Build and capture
+        env:
+          DEVICE_KIND: ${{ matrix.device }}
+        run: |
+          mkdir -p store-shots
+          xcrun simctl list devices available -j > /tmp/devices.json
+          DEVICE=$(python3 -c 'import os,json; ds=[d for r,ls in json.load(open("/tmp/devices.json"))["devices"].items() if "iOS" in r for d in ls]; print(next(d["udid"] for d in ds if ("iPhone" in d["name"] and "Pro Max" in d["name"]) if os.environ["DEVICE_KIND"]=="iphone") if os.environ["DEVICE_KIND"]=="iphone" else next(d["udid"] for d in ds if "iPad Pro 13" in d["name"]))')
+          xcrun simctl boot "$DEVICE"
+          xcrun simctl bootstatus "$DEVICE" -b
+          xcrun simctl status_bar "$DEVICE" override --time '9:41' --batteryState charged --batteryLevel 100
+          xcodebuild -project Kukkiri.xcodeproj -scheme Kukkiri -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build-screenshots CODE_SIGNING_ALLOWED=NO build > store-shots/build.log 2>&1
+          xcrun simctl install "$DEVICE" build-screenshots/Build/Products/Debug-iphonesimulator/Kukkiri.app
+          xcrun simctl launch "$DEVICE" app.kukkiri.upscaler.ios --store-screenshot
+          sleep 5
+          xcrun simctl io "$DEVICE" screenshot "store-shots/${DEVICE_KIND}-main.png"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kukkiri-${{ matrix.device }}
+          path: store-shots
