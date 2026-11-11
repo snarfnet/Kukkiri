@@ -1,0 +1,34 @@
+name: Enhancement validation
+on:
+  push:
+    branches: ["improve/**"]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Model regression tests
+        run: |
+          swiftc -target "$(uname -m)-apple-macosx14.0" Kukkiri/PrintMetrics.swift Tests/main.swift -o "$RUNNER_TEMP/model-tests"
+          "$RUNNER_TEMP/model-tests"
+      - name: Install XcodeGen
+        run: command -v xcodegen || brew install xcodegen
+      - name: Fetch bundled upscaling models
+        run: |
+          python3 -m pip install --break-system-packages gdown
+          python3 -m gdown 16JEWh48fgQc8az7avROePOd-PYda0Yi2 -O Kukkiri/realesrgan4x.mlmodel
+          python3 -m gdown 1qXdLx46Lpqya7Txc5Wvgkd2Dqlnqm3Qm -O Kukkiri/realesrgan_anime4x.mlmodel
+      - name: Build iPhone and iPad app
+        run: |
+          xcodegen generate
+          xcodebuild -project Kukkiri.xcodeproj -scheme Kukkiri -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build > build-validation.log 2>&1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-log
+          path: build-validation.log

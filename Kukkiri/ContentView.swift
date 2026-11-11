@@ -29,6 +29,9 @@ struct ContentView: View {
                         if let original = vm.original, let result = vm.result {
                             SizeCompareView(before: original, after: result, accent: accent, accent2: accent2, card: card)
                         }
+                        if let image = vm.result ?? vm.original {
+                            PrintPlanningView(image: image, isResult: vm.result != nil)
+                        }
                         controls
                     }
                 }
