@@ -1,6 +1,9 @@
 name: Kukkiri store screenshots
 on:
   workflow_dispatch:
+  push:
+    branches: ["improve/**"]
+    paths: [.github/workflows/store-screenshots.yml]
 permissions:
   contents: read
 jobs:
